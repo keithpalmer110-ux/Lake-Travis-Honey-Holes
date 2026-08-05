@@ -1,0 +1,2653 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Lake Travis Honey Holes</title>
+    <link rel="stylesheet" href="vendor/leaflet.css" />
+    <style>
+      :root {
+        --ink: #13261f;
+        --pine: #1f4d3a;
+        --water: #2a6f8f;
+        --sand: #e8dcc8;
+        --foam: #f4f7f5;
+        --line: rgba(19, 38, 31, 0.14);
+        --accent: #c47a2c;
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-left: env(safe-area-inset-left, 0px);
+        --safe-right: env(safe-area-inset-right, 0px);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, #d7e6df 0%, #c5d5e0 45%, #b7c9c0 100%);
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(300px, 400px) 1fr;
+        grid-template-areas: "panel map";
+        height: 100vh;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      .panel {
+        grid-area: panel;
+        background: rgba(244, 247, 245, 0.94);
+        border-right: 1px solid var(--line);
+        padding: 0;
+        height: 100vh;
+        max-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .panel-top {
+        flex: 0 1 auto;
+        max-height: 36vh;
+        overflow-y: auto;
+        padding: 0.75rem 1.1rem 0.75rem;
+        border-bottom: 1px solid var(--line);
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .source-bar {
+        flex: 0 0 auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 0.45rem 0.85rem 0.4rem;
+        background: #fff;
+        border-bottom: 2px solid var(--pine);
+        z-index: 5;
+      }
+
+      .source-bar .brand {
+        font-size: 1.1rem;
+        margin-bottom: 0.3rem;
+        line-height: 1.1;
+      }
+
+      .source-toggle {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.3rem;
+        width: 100%;
+      }
+
+      .source-toggle button {
+        width: 100%;
+        border: 1.5px solid var(--pine);
+        background: #fff;
+        color: var(--pine);
+        border-radius: 0.45rem;
+        padding: 0.35rem 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        cursor: pointer;
+        line-height: 1.1;
+        min-height: 0;
+      }
+
+      .source-toggle button.active {
+        background: var(--pine);
+        color: #fff;
+      }
+
+      .source-bar .kml-row {
+        display: flex;
+        flex-direction: row;
+        gap: 0.3rem;
+        margin-top: 0.3rem;
+      }
+
+      .source-bar .kml-row button,
+      .source-bar .kml-row .file-pick-btn {
+        flex: 1;
+        min-height: 0;
+        padding: 0.32rem 0.45rem;
+        font-size: 0.72rem;
+        border-radius: 0.4rem;
+      }
+
+      .source-bar .import-status {
+        margin-top: 0.25rem;
+        font-size: 0.7rem;
+        line-height: 1.25;
+      }
+
+      .live-bar {
+        margin-top: 0.4rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 0.55rem;
+        background: rgba(42, 111, 143, 0.08);
+        border: 1px solid rgba(42, 111, 143, 0.2);
+        font-size: 0.7rem;
+        line-height: 1.35;
+        color: var(--pine);
+      }
+
+      .live-bar strong {
+        display: block;
+        font-size: 0.65rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--water);
+        margin-bottom: 0.2rem;
+      }
+
+      .live-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.2rem 0.55rem;
+      }
+
+      .live-grid span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .live-tip {
+        margin-top: 0.3rem;
+        color: #355045;
+      }
+
+      .live-bar a {
+        color: var(--water);
+        font-weight: 700;
+      }
+
+      .live-bar .live-actions {
+        margin-top: 0.25rem;
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .live-bar button {
+        border: 1px solid rgba(42, 111, 143, 0.35);
+        background: #fff;
+        color: var(--water);
+        border-radius: 0.35rem;
+        padding: 0.15rem 0.4rem;
+        font-size: 0.65rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .info-window {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0.75rem 1.1rem 1rem;
+      }
+
+      .info-window-header {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.55rem;
+      }
+
+      .info-window-header strong {
+        font-size: 0.72rem;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--pine);
+      }
+
+      .info-window-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+
+      .info-window-header span {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.72rem;
+        color: #527062;
+      }
+
+      .sites-size-btn {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: none;
+        border: 1px solid var(--pine);
+        background: var(--pine);
+        color: #fff;
+        border-radius: 0.5rem;
+        padding: 0.35rem 0.65rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        cursor: pointer;
+        line-height: 1.1;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .sites-size-btn:active {
+        opacity: 0.88;
+      }
+
+      .view-bar {
+        display: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        grid-area: view;
+        background: #fff;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 0.28rem 0.45rem;
+        gap: 0.3rem;
+        z-index: 20;
+      }
+
+      .view-bar button {
+        flex: 1;
+        border: 1px solid var(--pine);
+        background: #fff;
+        color: var(--pine);
+        border-radius: 0.4rem;
+        padding: 0.35rem 0.25rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        cursor: pointer;
+        line-height: 1.1;
+        min-height: 1.85rem;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .view-bar button.active {
+        background: var(--pine);
+        color: #fff;
+      }
+
+      .map-expand-btn {
+        display: none;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        border: none;
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--pine);
+        border-radius: 0.45rem;
+        padding: 0.45rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .info-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        border: 1px solid var(--line);
+        border-radius: 0.8rem;
+        background: rgba(255, 255, 255, 0.55);
+        padding: 0.65rem;
+        -webkit-overflow-scrolling: touch;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+
+      .brand {
+        font-size: 1.1rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.3rem;
+      }
+
+      .brand em {
+        font-style: italic;
+        color: var(--water);
+      }
+
+      .lede {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.88rem;
+        color: var(--pine);
+        line-height: 1.4;
+        margin-bottom: 0.9rem;
+      }
+
+      .note {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        color: var(--pine);
+        background: rgba(196, 122, 44, 0.12);
+        border: 1px solid rgba(196, 122, 44, 0.28);
+        border-radius: 0.65rem;
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .filters {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-bottom: 1rem;
+      }
+
+      .filters button {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--pine);
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .filters button.active {
+        background: var(--pine);
+        color: #fff;
+        border-color: var(--pine);
+      }
+
+      .export-bar {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin-bottom: 1rem;
+        padding: 0.7rem 0.75rem;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 0.75rem;
+      }
+
+      .export-bar strong {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--water);
+      }
+
+      .export-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .export-actions button,
+      .gmaps-btn {
+        border: 1px solid var(--line);
+        background: rgba(42, 111, 143, 0.08);
+        color: var(--water);
+        border-radius: 0.5rem;
+        padding: 0.4rem 0.65rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .export-actions button:hover,
+      .gmaps-btn:hover {
+        background: var(--water);
+        color: #fff;
+        border-color: var(--water);
+      }
+
+      .export-hint {
+        font-size: 0.7rem;
+        color: #527062;
+        line-height: 1.35;
+      }
+
+      .import-bar {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin-bottom: 1rem;
+        padding: 0.7rem 0.75rem;
+        background: rgba(31, 77, 58, 0.06);
+        border: 1px solid rgba(31, 77, 58, 0.2);
+        border-radius: 0.75rem;
+      }
+
+      .import-bar strong {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--pine);
+      }
+
+      .import-status {
+        font-size: 0.75rem;
+        color: var(--pine);
+        line-height: 1.35;
+      }
+
+      .import-status em {
+        font-style: normal;
+        font-weight: 700;
+      }
+
+      #kml-file {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+        opacity: 0;
+      }
+
+      .file-pick-btn {
+        border: 1px solid var(--line);
+        background: rgba(42, 111, 143, 0.08);
+        color: var(--water);
+        border-radius: 0.4rem;
+        padding: 0.32rem 0.45rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        -webkit-tap-highlight-color: rgba(42, 111, 143, 0.25);
+      }
+
+      .file-pick-btn:active,
+      .file-pick-btn.pulse {
+        background: var(--water);
+        color: #fff;
+        border-color: var(--water);
+      }
+
+      .map-fallback {
+        display: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 1rem;
+        color: #fff;
+        background: #3a6070;
+        font-size: 0.95rem;
+        line-height: 1.4;
+      }
+
+      .map-fallback.show {
+        display: block;
+      }
+
+      .map-shell {
+        grid-area: map;
+        position: relative;
+        min-height: 100vh;
+        width: 100%;
+        height: 100%;
+        background: #9bb8c9;
+        z-index: 1;
+        overflow: hidden;
+      }
+
+      #map {
+        width: 100%;
+        height: 100%;
+        min-height: inherit;
+        background: #9bb8c9;
+        position: relative;
+        z-index: 1;
+      }
+
+      #map.leaflet-container {
+        width: 100%;
+        height: 100%;
+      }
+
+      .spot-actions {
+        margin-top: 0.55rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .spot-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+
+      .spot-card .spot-body {
+        max-height: 4.2rem;
+        overflow: hidden;
+        margin-top: 0.35rem;
+        padding-right: 0.2rem;
+        position: relative;
+      }
+
+      .spot-card .spot-body::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1.6rem;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
+        pointer-events: none;
+      }
+
+      .spot-card .spot-actions {
+        display: none;
+      }
+
+      .spot-card .expand-hint {
+        display: block;
+        width: 100%;
+        margin-top: 0.55rem;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.95rem;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: center;
+        color: #fff;
+        background: var(--pine);
+        border: 2px solid var(--pine);
+        border-radius: 0.65rem;
+        letter-spacing: 0.02em;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .spot-card.expanded .expand-hint {
+        background: var(--water);
+        border-color: var(--water);
+      }
+
+      .spot-card.expanded .spot-body {
+        max-height: none;
+        overflow: visible;
+      }
+
+      .spot-card.expanded .spot-body::after {
+        display: none;
+      }
+
+      .spot-card.expanded .spot-actions {
+        display: flex;
+      }
+
+      .leaflet-popup-content {
+        max-height: none;
+        overflow: visible;
+        margin: 10px 12px !important;
+      }
+
+      .popup-scroll {
+        max-height: min(42vh, 260px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        padding-right: 0.2rem;
+      }
+
+      .map-note {
+        display: none;
+        position: absolute;
+        z-index: 5000;
+        left: 12px;
+        top: 48px;
+        width: min(300px, calc(100% - 24px));
+        max-height: min(78vh, 460px);
+        background: #fff;
+        border-radius: 0.85rem;
+        box-shadow: 0 10px 28px rgba(19, 38, 31, 0.22);
+        border: 1px solid var(--line);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        overflow: hidden;
+        flex-direction: column;
+        pointer-events: auto;
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+      }
+
+      .map-note.show {
+        display: flex;
+      }
+
+      .layout.map-full .map-note {
+        max-height: min(82vh, 520px);
+        top: 56px;
+      }
+
+      .map-note-handle {
+        flex: 0 0 auto;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        padding: 0.65rem 2.4rem 0.5rem 0.85rem;
+        background: linear-gradient(180deg, #f7faf8 0%, #fff 100%);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .map-note-handle:active {
+        cursor: grabbing;
+      }
+
+      .map-note-handle .drag-hint {
+        display: block;
+        width: 36px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(19, 38, 31, 0.22);
+        margin: 0 auto 0.45rem;
+      }
+
+      .map-note-handle .popup-title {
+        margin-bottom: 0.15rem;
+        font-size: 1.05rem;
+        pointer-events: none;
+      }
+
+      .map-note-handle .map-note-meta {
+        font-size: 0.72rem;
+        color: var(--water);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        pointer-events: none;
+      }
+
+      .map-note-close {
+        position: absolute;
+        top: 0.45rem;
+        right: 0.45rem;
+        width: 2rem;
+        height: 2rem;
+        border: none;
+        border-radius: 999px;
+        background: rgba(19, 38, 31, 0.08);
+        color: var(--ink);
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+        z-index: 2;
+        pointer-events: auto;
+      }
+
+      .map-note-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: min(55vh, 320px);
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        padding: 0.7rem 0.85rem 0.85rem;
+        pointer-events: auto;
+      }
+
+      .layout.map-full .map-note-body {
+        max-height: min(60vh, 380px);
+      }
+
+      .map-note-body .popup-baits {
+        margin-top: 0.35rem;
+      }
+
+      .map-note-actions {
+        margin-top: 0.65rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .spot-card {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 0.8rem;
+        padding: 0.75rem 0.85rem;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .spot-card:hover,
+      .spot-card.active {
+        border-color: var(--water);
+        box-shadow: 0 8px 20px rgba(42, 111, 143, 0.12);
+      }
+
+      .spot-card h3 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.05rem;
+        margin-bottom: 0.2rem;
+      }
+
+      .spot-meta {
+        font-size: 0.72rem;
+        color: var(--water);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+      }
+
+      .spot-card p {
+        font-size: 0.82rem;
+        color: #355045;
+        line-height: 1.35;
+      }
+
+      .baits {
+        margin-top: 0.45rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+      }
+
+      .bait {
+        font-size: 0.7rem;
+        background: rgba(31, 77, 58, 0.16);
+        color: var(--pine);
+        border: none;
+        border-radius: 0.35rem;
+        padding: 0.25rem 0.5rem;
+        font-weight: 600;
+      }
+
+      .leaflet-popup-content-wrapper {
+        border-radius: 0.75rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .popup-title {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.05rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .popup-baits {
+        margin-top: 0.4rem;
+        font-size: 0.82rem;
+        line-height: 1.35;
+      }
+
+      .popup-baits strong {
+        color: var(--accent);
+      }
+
+      @media (max-width: 860px) {
+        .layout {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-rows: minmax(240px, 42vh) auto minmax(0, 1fr);
+          grid-template-areas:
+            "map"
+            "view"
+            "panel";
+          height: 100vh;
+          height: 100dvh;
+          overflow: hidden;
+        }
+
+        /* Map on top with a reliable min height (avoids blank map on iOS) */
+        .map-shell,
+        #map {
+          min-height: 240px;
+          height: 100%;
+          width: 100%;
+        }
+
+        .panel {
+          height: 100%;
+          max-height: none;
+          min-height: 0;
+          border-right: none;
+          border-top: none;
+          padding-bottom: var(--safe-bottom);
+          padding-left: var(--safe-left);
+          padding-right: var(--safe-right);
+        }
+
+        .view-bar {
+          display: flex;
+        }
+
+        .map-expand-btn {
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .sites-size-btn {
+          display: inline-flex;
+          align-items: center;
+          min-height: 1.85rem;
+          padding: 0.3rem 0.55rem;
+          font-size: 0.72rem;
+        }
+
+        /* Map fills the screen — list hidden */
+        .layout.map-full {
+          grid-template-rows: minmax(0, 1fr) auto;
+          grid-template-areas:
+            "map"
+            "view";
+        }
+
+        .layout.map-full .panel {
+          display: none;
+        }
+
+        .layout.map-full .map-shell,
+        .layout.map-full #map {
+          min-height: 0;
+          height: 100%;
+        }
+
+        /* List fills the screen — map hidden */
+        .layout.sites-full {
+          grid-template-rows: auto minmax(0, 1fr);
+          grid-template-areas:
+            "view"
+            "panel";
+        }
+
+        .layout.sites-full .map-shell {
+          display: none;
+        }
+
+        .layout.sites-full .info-window {
+          flex: 1 1 auto;
+        }
+
+        /* Larger list, smaller map (in-between) */
+        .layout.sites-large {
+          grid-template-rows: minmax(110px, 18vh) auto minmax(0, 1fr);
+        }
+
+        .layout.sites-large .map-shell,
+        .layout.sites-large #map {
+          min-height: 110px;
+        }
+
+        .source-bar {
+          padding: 0.4rem 0.75rem 0.35rem;
+        }
+
+        .source-bar .brand,
+        .brand {
+          font-size: 1.05rem;
+          margin-bottom: 0.25rem;
+          line-height: 1.1;
+        }
+
+        .source-toggle {
+          gap: 0.3rem;
+        }
+
+        .source-toggle button {
+          min-height: 1.85rem;
+          padding: 0.3rem 0.35rem;
+          font-size: 0.75rem;
+          border-radius: 0.45rem;
+        }
+
+        .source-bar .kml-row {
+          flex-direction: row;
+          gap: 0.3rem;
+          position: relative;
+          margin-top: 0.25rem;
+        }
+
+        .source-bar .kml-row button,
+        .source-bar .kml-row .file-pick-btn {
+          min-height: 1.75rem;
+          padding: 0.28rem 0.4rem;
+          font-size: 0.7rem;
+          width: auto;
+          flex: 1;
+          text-align: center;
+        }
+
+        .source-bar .import-status,
+        .import-status {
+          font-size: 0.68rem;
+          line-height: 1.25;
+          margin-top: 0.2rem;
+        }
+
+        .panel-top {
+          max-height: none;
+          flex: 0 1 auto;
+          padding: 0.7rem 0.9rem;
+        }
+
+        .lede {
+          font-size: 1rem;
+          line-height: 1.45;
+          margin-bottom: 0.7rem;
+        }
+
+        .note {
+          font-size: 0.9rem;
+          line-height: 1.45;
+          padding: 0.75rem 0.85rem;
+        }
+
+        .filters {
+          gap: 0.45rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .filters button {
+          min-height: 2.4rem;
+          padding: 0.55rem 0.9rem;
+          font-size: 0.88rem;
+          border-radius: 999px;
+        }
+
+        .export-bar {
+          padding: 0.75rem 0.85rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .export-bar strong {
+          font-size: 0.8rem;
+        }
+
+        .export-actions {
+          flex-direction: column;
+        }
+
+        .export-hint {
+          font-size: 0.82rem;
+          line-height: 1.45;
+        }
+
+        .info-window {
+          padding: 0.55rem 0.75rem 0.85rem;
+        }
+
+        .info-window-header strong,
+        .info-window-header span {
+          font-size: 0.82rem;
+        }
+
+        .info-scroll {
+          padding: 0.55rem;
+          border-radius: 0.9rem;
+        }
+
+        .spot-list {
+          gap: 0.75rem;
+        }
+
+        .spot-card {
+          padding: 0.9rem 1rem;
+          border-radius: 0.9rem;
+        }
+
+        .spot-card h3 {
+          font-size: 1.2rem;
+          line-height: 1.2;
+          margin-bottom: 0.3rem;
+        }
+
+        .spot-meta {
+          font-size: 0.8rem;
+          margin-bottom: 0.4rem;
+        }
+
+        .spot-card p {
+          font-size: 0.95rem;
+          line-height: 1.45;
+        }
+
+        .spot-card .spot-body {
+          max-height: 4.5rem;
+        }
+
+        .spot-card.expanded .spot-body {
+          max-height: none;
+        }
+
+        .bait {
+          font-size: 0.8rem;
+          padding: 0.3rem 0.6rem;
+        }
+
+        .spot-actions button,
+        .spot-actions .gmaps-btn {
+          min-height: 2.5rem;
+          font-size: 0.88rem;
+        }
+
+        .leaflet-popup-content {
+          max-height: min(45vh, 280px);
+          font-size: 1rem;
+        }
+
+        .popup-title {
+          font-size: 1.15rem;
+        }
+
+        .popup-baits {
+          font-size: 0.95rem;
+          line-height: 1.4;
+        }
+
+        .popup-scroll {
+          max-height: min(40vh, 240px);
+        }
+
+        .map-note {
+          width: min(320px, calc(100% - 20px));
+          max-height: min(72%, 460px);
+        }
+
+        .map-note-body {
+          font-size: 0.95rem;
+          line-height: 1.45;
+        }
+
+        .leaflet-control-zoom a {
+          width: 40px !important;
+          height: 40px !important;
+          line-height: 40px !important;
+          font-size: 20px !important;
+        }
+      }
+
+      @media (min-width: 861px) {
+        .view-bar {
+          display: flex;
+          position: fixed;
+          bottom: 14px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(360px, calc(100% - 1.5rem));
+          border: 1px solid var(--line);
+          border-radius: 999px;
+          box-shadow: 0 6px 24px rgba(19, 38, 31, 0.16);
+          padding: 0.35rem;
+          grid-area: unset;
+        }
+
+        .map-expand-btn,
+        .sites-size-btn {
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .layout.map-full {
+          grid-template-columns: 1fr;
+          grid-template-areas: "map";
+        }
+
+        .layout.map-full .panel {
+          display: none;
+        }
+
+        .layout.map-full .map-shell {
+          min-height: 100vh;
+        }
+
+        .layout.sites-full {
+          grid-template-columns: 1fr;
+          grid-template-areas: "panel";
+        }
+
+        .layout.sites-full .map-shell {
+          display: none;
+        }
+
+        .layout.sites-full .panel {
+          max-width: 720px;
+          margin: 0 auto;
+          border-right: none;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .source-bar .brand,
+        .brand {
+          font-size: 0.98rem;
+        }
+
+        .source-toggle button {
+          font-size: 0.7rem;
+          min-height: 1.7rem;
+          padding: 0.25rem 0.3rem;
+        }
+
+        .source-bar .kml-row .file-pick-btn,
+        .source-bar .kml-row button {
+          font-size: 0.65rem;
+          min-height: 1.6rem;
+          padding: 0.22rem 0.35rem;
+        }
+
+        .layout {
+          grid-template-rows: minmax(200px, 36vh) auto minmax(0, 1fr);
+        }
+
+        .map-shell,
+        #map {
+          min-height: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="panel">
+        <div class="source-bar">
+          <h1 class="brand">Lake Travis <em>Honey Holes</em></h1>
+          <div class="source-toggle" id="source-toggle">
+            <button type="button" id="btn-compiled" class="active" data-source="compiled">Travis Bass Sites</button>
+            <button type="button" id="btn-torwich" data-source="torwich">Guide Sites</button>
+          </div>
+          <div class="export-actions kml-row">
+            <label for="kml-file" id="load-kml" class="file-pick-btn">Choose Guide KML…</label>
+            <button type="button" id="clear-torwich" hidden>Clear Guide</button>
+            <!-- accept=* helps iPhone Files show .kml documents -->
+            <input
+              id="kml-file"
+              type="file"
+              accept="*/*"
+            />
+          </div>
+          <p class="import-status" id="import-status">
+            Showing <em>Travis Bass Sites</em>. Tap <em>Choose Guide KML…</em> to load a file.
+          </p>
+          <div class="live-bar" id="live-bar" aria-live="polite">
+            <strong>Live conditions</strong>
+            <div class="live-grid" id="live-grid">
+              <span id="live-level">Lake: loading…</span>
+              <span id="live-vs-full">vs full: —</span>
+              <span id="live-weather">Weather: loading…</span>
+              <span id="live-wind">Wind: —</span>
+            </div>
+            <p class="live-tip" id="live-tip">Fetching lake level and local weather…</p>
+            <div class="live-actions">
+              <button type="button" id="live-refresh">Refresh</button>
+              <a href="https://www.lcra.org/water/flood/" target="_blank" rel="noopener">LCRA</a>
+              <a href="https://www.weather.gov/ewx/" target="_blank" rel="noopener">NWS</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-window">
+          <div class="info-window-header">
+            <strong id="info-window-title">Travis Bass Sites</strong>
+            <div class="info-window-tools">
+              <span id="info-window-count"></span>
+              <button type="button" id="sites-size-btn" class="sites-size-btn" aria-pressed="false">
+                Expand list
+              </button>
+            </div>
+          </div>
+          <div class="info-scroll" id="info-scroll">
+            <div class="spot-list" id="spot-list"></div>
+          </div>
+        </div>
+      </aside>
+      <div class="view-bar" id="view-bar" role="toolbar" aria-label="Map and list layout">
+        <button type="button" id="btn-view-map" data-view="map">Expand map</button>
+        <button type="button" id="btn-view-split" data-view="split" class="active">Split</button>
+        <button type="button" id="btn-view-list" data-view="list">Expand list</button>
+      </div>
+      <div class="map-shell">
+        <div id="map" aria-label="Map of Lake Travis fishing spots">
+          <div class="map-fallback" id="map-fallback">
+            Map could not load. Open this page from the Mac server link on Wi‑Fi (not as a lone file), and keep the
+            <em>vendor</em> folder next to index.html.
+          </div>
+        </div>
+        <button type="button" id="map-expand-btn" class="map-expand-btn">Expand map</button>
+        <div class="map-note" id="map-note" aria-live="polite">
+          <button type="button" class="map-note-close" id="map-note-close" aria-label="Close note">×</button>
+          <div class="map-note-handle" id="map-note-handle">
+            <span class="drag-hint" aria-hidden="true"></span>
+            <div class="popup-title" id="map-note-title"></div>
+            <div class="map-note-meta" id="map-note-meta"></div>
+          </div>
+          <div class="map-note-body" id="map-note-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/leaflet.js"></script>
+    <script>
+      // Local marker icons (no CDN)
+      var DefaultIcon = L.icon({
+        iconUrl: "vendor/marker-icon.png",
+        iconRetinaUrl: "vendor/marker-icon-2x.png",
+        shadowUrl: "vendor/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+      L.Marker.prototype.options.icon = DefaultIcon;
+
+      /**
+       * Travis Bass Sites pins verified inside the OpenStreetMap Lake Travis water polygon.
+       * Boat-access bass pins (largemouth + white bass patterns combined).
+       */
+      var historicSpots = [
+        {
+          id: "mansfield",
+          name: "Mansfield Dam Park Point",
+          lat: 30.3926,
+          lng: -97.9033,
+          access: "Shore",
+          targets: ["Bass", "Catfish"],
+          season: "Year-round; strong spring & winter",
+          why: "Long point into deep water with steep drop-offs. Protected cove gets less boat pressure. Classic dam-end structure for schooling bass.",
+          baits: ["Football jig", "Texas-rig craw", "Drop-shot worm", "Cut bait / stinkbait (catfish)"],
+          history: "Frequently cited as the best free shoreline start on Travis; dam basin also holds deeper striper/catfish activity."
+        },
+        {
+          id: "pace-bend",
+          name: "Pace Bend West Bluffs",
+          lat: 30.4470,
+          lng: -98.0160,
+          access: "Shore",
+          targets: ["Bass"],
+          season: "Summer & low-light; winter on vertical rock",
+          why: "Steep rocky bluff walls on the west side. Bass pin to vertical limestone when water is clear and deep.",
+          baits: ["Football jig", "Deep crankbait", "Spinnerbait", "Jigging spoon"],
+          history: "Large Travis County park (~9 miles of shoreline). West bluffs repeatedly recommended for summer deep-bank bass."
+        },
+        {
+          id: "arkansas-bend",
+          name: "Arkansas Bend Points",
+          lat: 30.4625,
+          lng: -97.9979,
+          access: "Shore",
+          targets: ["Bass"],
+          season: "Spring mornings; year-round on rock transitions",
+          why: "Quieter north-shore park with gradual slopes and small rocky drop-offs — ambush spots that hold multiple fish.",
+          baits: ["Texas-rig Senko / craw", "Paddle-tail swimbait", "Heddon Spook / walking topwater"],
+          history: "Lago Vista north shore staple; boat ramps nearby make it a hybrid shore/boat launch honey area."
+        },
+        {
+          id: "windy-point",
+          name: "Windy Point Rock Drop",
+          lat: 30.4155,
+          lng: -97.9085,
+          access: "Shore",
+          targets: ["Bass"],
+          season: "Year-round around rocks & nearby cove points",
+          why: "Large rocks and nearby cove points create ambush structure. Good shore casting into depth changes.",
+          baits: ["Jig", "Soft plastic creature bait", "Spinnerbait on points"],
+          history: "Known publicly for diving access, but fishing reports consistently mention rock structure and adjacent coves."
+        },
+        {
+          id: "cypress-creek",
+          name: "Cypress Creek Arm",
+          lat: 30.4255,
+          lng: -97.9530,
+          access: "Shore",
+          targets: ["Bass", "Crappie"],
+          season: "High water / flooded brush periods",
+          why: "When lake level rises, flooded brush becomes ambush cover. Calm coves and moderate depths.",
+          baits: ["Spinnerbait", "Texas-rig lizard", "Jig for crappie", "Weedless swimbait"],
+          history: "Repeatedly listed for high-water bank fishing when brush is inundated."
+        },
+        {
+          id: "sandy-creek",
+          name: "Sandy Creek Arm Mouth",
+          lat: 30.4520,
+          lng: -98.0060,
+          access: "Boat",
+          targets: ["Bass", "White bass"],
+          season: "Spring white bass run; winter deep banks",
+          why: "Mix of shallow flats and submerged timber where the creek arm meets main lake water. White bass and largemouth stage here.",
+          baits: ["Small crankbait", "Jigging spoon", "White bass slabs", "Suspending jerkbait"],
+          history: "TPWD notes white bass runs Feb–May in major creek arms; Sandy Creek is a long-standing boat honey area."
+        },
+        {
+          id: "pedernales",
+          name: "Pedernales River Arm",
+          lat: 30.4988,
+          lng: -98.0900,
+          access: "Boat",
+          targets: ["White bass", "Bass"],
+          season: "Feb–May white bass run; warming spring pockets",
+          why: "Major river/creek arm. Spring runs push white bass up the arm; bass use protected pockets on warm trends.",
+          baits: ["Slab spoons", "Small spinnerbaits", "Jerkbait", "Texas-rig lizard"],
+          history: "Explicitly called out in TPWD Travis notes for spring white bass runs with the upper Colorado arm."
+        },
+        {
+          id: "hudson-bend",
+          name: "Hudson Bend / Marina Pattern",
+          lat: 30.4005,
+          lng: -97.9393,
+          access: "Boat",
+          targets: ["Bass"],
+          season: "Summer marinas; winter bluff walls nearby",
+          why: "Marina docks, slips, and nearby bluff ends concentrate summer schooling bass in clear water.",
+          baits: ["Drop-shot finesse worm", "Ned / free rig", "Walking topwater at first light", "Flutter spoon"],
+          history: "Guide reports often key on Travis marinas in summer; Hudson Bend sits in a classic clear-water marina corridor."
+        },
+        {
+          id: "cow-creek",
+          name: "Cow Creek Arm",
+          lat: 30.4820,
+          lng: -98.0140,
+          access: "Boat",
+          targets: ["Bass"],
+          season: "Pre-spawn / early spring",
+          why: "Protected pockets and secondary points where bass push shallow on warming trends.",
+          baits: ["Suspending jerkbait", "Spinnerbait", "Texas-rig lizard", "Squarebill"],
+          history: "Named in seasonal Travis bass pattern writeups alongside Pedernales and Sandy Creek for spring movement."
+        },
+        {
+          id: "starnes",
+          name: "Starnes Island Vicinity",
+          lat: 30.4030,
+          lng: -97.8920,
+          access: "Boat",
+          targets: ["Bass"],
+          season: "Early morning before boat traffic",
+          why: "Island/structure area popular with boaters; productive before recreational traffic builds.",
+          baits: ["Topwater walker", "Swimbait", "Drop-shot", "Jig"],
+          history: "Listed in Highland Lakes fishing guides as a boat honey zone for dawn bites."
+        },
+        {
+          id: "volente-wharf",
+          name: "Volente / Wharf Cove Drop",
+          lat: 30.4383,
+          lng: -97.9197,
+          access: "Shore",
+          targets: ["Bass"],
+          season: "Anytime fish relate to roadside drop-offs",
+          why: "Road end / fence line into water with drop-offs — subtle edge fish use as ambush structure.",
+          baits: ["Soft plastic drag baits", "Topwater along edge", "Light jig"],
+          history: "Documented shore oddity near Volente Beach — fence and drop-offs create a unique public cast."
+        },
+        {
+          id: "dam-basin",
+          name: "Dam Basin Deep Water",
+          lat: 30.3948,
+          lng: -97.9063,
+          access: "Boat",
+          targets: ["Catfish", "Striped bass", "Bass"],
+          season: "Summer deep; winter vertical structure",
+          why: "Deep lower-lake basin near Mansfield Dam. Sonar for schools in deeper water for stripers/cats; bass on nearby ledges.",
+          baits: ["Live/cut bait", "Jigging spoon", "Deep drop-shot", "Heavy jig"],
+          history: "Casago/Highland Lakes guides highlight the basin for deeper striper and catfish action."
+        },
+        {
+          id: "briarcliff",
+          name: "Briarcliff Marina Pockets",
+          lat: 30.4153,
+          lng: -98.0446,
+          access: "Boat",
+          targets: ["Bass"],
+          season: "Spring warming trends",
+          why: "Marina pockets and secondary points — classic pre-spawn staging water in the western arms.",
+          baits: ["Jerkbait", "Spinnerbait", "Dock-skipping soft plastic"],
+          history: "Appears in spring Travis area lists with Cow Creek and Pedernales as warming-water pockets."
+        },
+        {
+          id: "offshore-humps",
+          name: "Main-Lake Channel Ledges",
+          lat: 30.4260,
+          lng: -97.9540,
+          access: "Boat",
+          targets: ["Bass"],
+          season: "Late spring–summer; post-flood brush in deeper water",
+          why: "Clear-water Travis fish relate to offshore humps, rock, and brush in the main lake. Use sonar — move if no bites in ~15 minutes.",
+          baits: ["Drop-shot", "Texas rig (weedless)", "Carolina rig", "Weedless swimbait / underspin"],
+          history: "Modern Travis guide reports emphasize offshore humps with brush/rock as a primary summer/post-rise pattern."
+        }
+      ];
+
+      function isBassRelatedSpot(spot) {
+        return (spot.targets || []).some(function (t) {
+          var n = String(t).toLowerCase();
+          return n === "bass" || n === "white bass";
+        });
+      }
+
+      function isClassicBoatBassSpot(spot) {
+        return spot.access === "Boat" && isBassRelatedSpot(spot);
+      }
+
+      function asBassSpot(spot) {
+        var copy = {};
+        for (var k in spot) {
+          if (Object.prototype.hasOwnProperty.call(spot, k)) copy[k] = spot[k];
+        }
+        // Largemouth + white bass shown together as Bass
+        copy.targets = ["Bass"];
+        return copy;
+      }
+
+      historicSpots = historicSpots.filter(isClassicBoatBassSpot).map(asBassSpot);
+
+      var spots = historicSpots.slice();
+      var usingCustomKml = false;
+      var customKmlName = "";
+      var torwichSpots = null;
+      var map = null;
+      var markersById = {};
+
+      function showMapFallback(message) {
+        var el = document.getElementById("map-fallback");
+        if (!el) return;
+        if (message) el.textContent = message;
+        el.classList.add("show");
+      }
+
+      if (typeof L === "undefined") {
+        showMapFallback(
+          "Map library missing. Open this page via the Mac Wi‑Fi link and keep the vendor folder with index.html."
+        );
+      } else {
+        map = L.map("map", {
+          center: [30.44, -97.97],
+          zoom: 11,
+          scrollWheelZoom: true
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 18,
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+
+        function refreshMapSize() {
+          if (!map) return;
+          setTimeout(function () {
+            map.invalidateSize();
+          }, 150);
+        }
+        window.addEventListener("resize", refreshMapSize);
+        window.addEventListener("orientationchange", refreshMapSize);
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) refreshMapSize();
+        });
+        refreshMapSize();
+      }
+
+      function setSourceButtons(mode) {
+        var compiledBtn = document.getElementById("btn-compiled");
+        var torwichBtn = document.getElementById("btn-torwich");
+        if (compiledBtn) compiledBtn.classList.toggle("active", mode === "compiled");
+        if (torwichBtn) torwichBtn.classList.toggle("active", mode === "torwich");
+      }
+
+      function updateSourceUI() {
+        var status = document.getElementById("import-status");
+        var clearBtn = document.getElementById("clear-torwich");
+        if (usingCustomKml) {
+          setSourceButtons("torwich");
+          status.innerHTML =
+            "Showing <em>Guide Sites</em> (" +
+            spots.length +
+            " pins)" +
+            (customKmlName ? " from <em>" + customKmlName + "</em>" : "") +
+            ".";
+          document.getElementById("info-window-title").textContent = "Guide Sites";
+          if (clearBtn) clearBtn.hidden = false;
+        } else {
+          setSourceButtons("compiled");
+          status.innerHTML =
+            "Showing <em>Travis Bass Sites</em> — boat bass (includes white bass).";
+          document.getElementById("info-window-title").textContent = "Travis Bass Sites";
+          if (clearBtn) clearBtn.hidden = !torwichSpots;
+        }
+      }
+
+      function clearTorwichData() {
+        torwichSpots = null;
+        customKmlName = "";
+        showCompiledSites();
+      }
+
+      function stripHtml(html) {
+        var tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        return (tmp.textContent || tmp.innerText || "")
+          .replace(/\u00a0/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function textContentOf(el, tagName) {
+        if (!el) return "";
+        var nodes = el.getElementsByTagName(tagName);
+        if (!nodes.length) return "";
+        return (nodes[0].textContent || "").trim();
+      }
+
+      function extendedDataValue(placemark, key) {
+        var lower = key.toLowerCase();
+        var datas = placemark.getElementsByTagName("Data");
+        for (var i = 0; i < datas.length; i++) {
+          var name = (datas[i].getAttribute("name") || "").toLowerCase();
+          if (name === lower) {
+            return textContentOf(datas[i], "value");
+          }
+        }
+        var simple = placemark.getElementsByTagName("SimpleData");
+        for (var j = 0; j < simple.length; j++) {
+          var sname = (simple[j].getAttribute("name") || "").toLowerCase();
+          if (sname === lower) {
+            return (simple[j].textContent || "").trim();
+          }
+        }
+        return "";
+      }
+
+      function firstPointCoordinates(placemark) {
+        // Prefer true Point geometry only (skip path/line/polygon "blocks")
+        var points = placemark.getElementsByTagName("Point");
+        for (var p = 0; p < points.length; p++) {
+          var coordsNodes = points[p].getElementsByTagName("coordinates");
+          if (!coordsNodes.length) continue;
+          var raw = (coordsNodes[0].textContent || "").trim();
+          if (!raw) continue;
+          var first = raw.split(/\s+/)[0];
+          var parts = first.split(",");
+          if (parts.length >= 2) {
+            var lng = parseFloat(parts[0]);
+            var lat = parseFloat(parts[1]);
+            if (isFinite(lat) && isFinite(lng)) {
+              return { lat: lat, lng: lng };
+            }
+          }
+        }
+        return null;
+      }
+
+      function placemarkIsPathOrShape(placemark) {
+        return (
+          placemark.getElementsByTagName("LineString").length > 0 ||
+          placemark.getElementsByTagName("LinearRing").length > 0 ||
+          placemark.getElementsByTagName("Polygon").length > 0 ||
+          placemark.getElementsByTagName("Track").length > 0 ||
+          placemark.getElementsByTagName("gx:Track").length > 0
+        );
+      }
+
+      function stripBaitNumber(label) {
+        return String(label || "")
+          .replace(/^\s*\d{1,2}[\.\)\:\-]\s*/, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function splitBaitsList(raw) {
+        var text = String(raw || "").replace(/\u00a0/g, " ").trim();
+        if (!text) return [];
+
+        // Prefer splitting on numbered markers: 1. 2) 3: etc.
+        var numbered = text
+          .split(/(?:^|[\n\r;]+|\s+)(?=\d{1,2}[\.\)\:]\s+\S)/)
+          .map(stripBaitNumber)
+          .filter(function (s) {
+            return s && !/^(baits?|lures?)$/i.test(s);
+          });
+        if (numbered.length > 1) return numbered;
+
+        // Also catch inline "1. Foo 2. Bar" stuck together
+        var inlineParts = [];
+        var re = /\d{1,2}[\.\)\:]\s*([^]+?)(?=\s*\d{1,2}[\.\)\:]\s*|$)/g;
+        var match;
+        while ((match = re.exec(text)) !== null) {
+          var part = stripBaitNumber(match[0]);
+          if (part) inlineParts.push(part);
+        }
+        if (inlineParts.length > 1) return inlineParts;
+
+        return text
+          .split(/[;\n\r|]+|\s*,\s*/)
+          .map(stripBaitNumber)
+          .filter(Boolean);
+      }
+
+      function parseBaitsFromText(text) {
+        if (!text) return [];
+        var section = "";
+        // Multi-line "Baits:" block through next blank line / next Label:
+        var block = text.match(
+          /baits?\s*:\s*([\s\S]*?)(?=\n\s*[A-Za-z][A-Za-z Sp]*\s*:|\n\s*\n|$)/i
+        );
+        if (block) {
+          section = block[1];
+        } else {
+          var line = text.match(/baits?\s*:\s*([^\n\r]+)/i);
+          if (line) section = line[1];
+        }
+        // If no Baits: header, still try numbered list anywhere in the note
+        if (!section) {
+          if (/\d{1,2}[\.\)\:]\s+\S/.test(text)) section = text;
+          else return [];
+        }
+        return splitBaitsList(section);
+      }
+
+      function parseKml(xmlText) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(xmlText, "text/xml");
+        if (doc.getElementsByTagName("parsererror").length) {
+          throw new Error("Could not parse that KML file.");
+        }
+        var placemarks = doc.getElementsByTagName("Placemark");
+        var parsed = [];
+        var skippedPaths = 0;
+        for (var i = 0; i < placemarks.length; i++) {
+          var pm = placemarks[i];
+          if (placemarkIsPathOrShape(pm) && !pm.getElementsByTagName("Point").length) {
+            skippedPaths++;
+            continue;
+          }
+          var coords = firstPointCoordinates(pm);
+          if (!coords) {
+            if (placemarkIsPathOrShape(pm)) skippedPaths++;
+            continue;
+          }
+
+          var rawName = textContentOf(pm, "name");
+          var name = rawName.replace(/\s+/g, " ").trim();
+          if (
+            !name ||
+            /^untitled$/i.test(name) ||
+            /^unnamed$/i.test(name) ||
+            /^new placemark$/i.test(name)
+          ) {
+            name = "Pin " + (parsed.length + 1);
+          }
+          var pinNumber = parsed.length + 1;
+          var pinFromName = name.match(/^pin\s*(\d+)\s*$/i);
+          if (pinFromName) pinNumber = parseInt(pinFromName[1], 10);
+          var descRaw = "";
+          var descNodes = pm.getElementsByTagName("description");
+          if (descNodes.length) {
+            descRaw = descNodes[0].textContent || "";
+          }
+          var descText = stripHtml(descRaw);
+
+          var access =
+            extendedDataValue(pm, "access") ||
+            extendedDataValue(pm, "Access") ||
+            "";
+          var targetsRaw =
+            extendedDataValue(pm, "targets") ||
+            extendedDataValue(pm, "Targets") ||
+            extendedDataValue(pm, "species") ||
+            "";
+          var targets = targetsRaw
+            ? targetsRaw.split(/[;,|]/).map(function (s) {
+                return s.trim();
+              }).filter(Boolean)
+            : [];
+          var baitsRaw =
+            extendedDataValue(pm, "baits") ||
+            extendedDataValue(pm, "Baits") ||
+            "";
+          var baits = baitsRaw
+            ? splitBaitsList(baitsRaw)
+            : parseBaitsFromText(descText);
+
+          var season =
+            extendedDataValue(pm, "season") ||
+            extendedDataValue(pm, "Season") ||
+            "";
+
+          parsed.push({
+            id: "kml-" + i + "-" + coords.lat + "-" + coords.lng,
+            name: name,
+            pinNumber: pinNumber,
+            lat: coords.lat,
+            lng: coords.lng,
+            access: access,
+            targets: targets,
+            season: season,
+            why: descText,
+            baits: baits,
+            history: ""
+          });
+        }
+        if (!parsed.length) {
+          throw new Error(
+            skippedPaths
+              ? "No point pins found. That KML has " +
+                  skippedPaths +
+                  " path/shape feature(s) but no map pins."
+              : "No placemarks with point coordinates found in that KML."
+          );
+        }
+        parsed._skippedPaths = skippedPaths;
+        return parsed;
+      }
+
+      function applyCustomSpots(list, fileName) {
+        torwichSpots = list;
+        spots = list;
+        usingCustomKml = true;
+        customKmlName = fileName || customKmlName || "";
+        updateSourceUI();
+        if (list._skippedPaths) {
+          var status = document.getElementById("import-status");
+          status.innerHTML +=
+            " Skipped <em>" +
+            list._skippedPaths +
+            "</em> untitled path/shape feature(s).";
+        }
+        renderList();
+        if (typeof window.setViewMode === "function") window.setViewMode("list");
+      }
+
+      function showCompiledSites() {
+        spots = historicSpots.slice();
+        usingCustomKml = false;
+        updateSourceUI();
+        renderList();
+        if (typeof window.setViewMode === "function") window.setViewMode("list");
+      }
+
+      function showTorwichSites() {
+        if (torwichSpots && torwichSpots.length) {
+          applyCustomSpots(torwichSpots, customKmlName);
+          return;
+        }
+        setSourceButtons("torwich");
+        document.getElementById("import-status").innerHTML =
+          "Tap <em>Choose Guide KML…</em> below, then pick your .kml file from Files.";
+        var pick = document.getElementById("load-kml");
+        if (pick) {
+          pick.classList.add("pulse");
+          pick.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          setTimeout(function () {
+            pick.classList.remove("pulse");
+          }, 1800);
+        }
+      }
+
+      function visibleSpots() {
+        return spots;
+      }
+
+      function googleMapsUrl(spot) {
+        // Drops a labeled pin at the exact water coordinate
+        var label = encodeURIComponent(spot.name).replace(/%20/g, "+");
+        return (
+          "https://www.google.com/maps?q=" +
+          spot.lat +
+          "," +
+          spot.lng +
+          "+(" +
+          label +
+          ")&ll=" +
+          spot.lat +
+          "," +
+          spot.lng +
+          "&z=16"
+        );
+      }
+
+      function escapeXml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+      }
+
+      function downloadFile(filename, content, mime) {
+        var blob = new Blob([content], { type: mime });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      }
+
+      function safeFilename(name) {
+        return String(name || "waypoint")
+          .replace(/[^\w\-]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_|_$/g, "")
+          .slice(0, 40) || "waypoint";
+      }
+
+      function buildGpxForSpot(spot) {
+        var descParts = [];
+        var meta = spotMetaLine(spot);
+        if (meta) descParts.push(meta);
+        if (spot.baits && spot.baits.length) {
+          descParts.push("Baits: " + spot.baits.filter(meaningfulMetaPart).join(", "));
+        }
+        if (spot.why && meaningfulMetaPart(spot.why)) descParts.push(spot.why);
+        var desc = descParts.join(" — ");
+        return (
+          '<?xml version="1.0" encoding="UTF-8"?>\n' +
+          '<gpx version="1.1" creator="Lake Travis Honey Holes"\n' +
+          '  xmlns="http://www.topografixix.com/GPX/1/1">\n' +
+          "  <wpt lat=\"" +
+          spot.lat +
+          '" lon="' +
+          spot.lng +
+          '">\n' +
+          "    <name>" +
+          escapeXml(spot.name) +
+          "</name>\n" +
+          (desc
+            ? "    <desc>" + escapeXml(desc) + "</desc>\n"
+            : "") +
+          "    <sym>Fishing Hot Spot Facility</sym>\n" +
+          "  </wpt>\n" +
+          "</gpx>\n"
+        );
+      }
+
+      function buildKml(list) {
+        var placemarks = list
+          .map(function (spot) {
+            var desc =
+              "<b>" +
+              escapeXml(spot.access) +
+              "</b> · " +
+              escapeXml(spot.targets.join(", ")) +
+              "<br/><b>Baits:</b> " +
+              escapeXml(spot.baits.join(", ")) +
+              "<br/>" +
+              escapeXml(spot.why) +
+              "<br/><b>Season:</b> " +
+              escapeXml(spot.season) +
+              "<br/><b>Coords:</b> " +
+              spot.lat +
+              ", " +
+              spot.lng +
+              '<br/><a href="' +
+              escapeXml(googleMapsUrl(spot)) +
+              '">Open pin in Google Maps</a>';
+            return (
+              "    <Placemark>\n" +
+              "      <name>" +
+              escapeXml(spot.name) +
+              "</name>\n" +
+              "      <description><![CDATA[" +
+              desc +
+              "]]></description>\n" +
+              "      <styleUrl>#honeyHolePin</styleUrl>\n" +
+              "      <Point>\n" +
+              "        <coordinates>" +
+              spot.lng +
+              "," +
+              spot.lat +
+              ",0</coordinates>\n" +
+              "      </Point>\n" +
+              "    </Placemark>"
+            );
+          })
+          .join("\n");
+
+        return (
+          '<?xml version="1.0" encoding="UTF-8"?>\n' +
+          '<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+          "  <Document>\n" +
+          "    <name>Lake Travis Honey Holes</name>\n" +
+          "    <description>Public fishing spots near Austin, TX — pins at water coordinates</description>\n" +
+          '    <Style id="honeyHolePin">\n' +
+          "      <IconStyle>\n" +
+          "        <scale>1.1</scale>\n" +
+          "        <Icon>\n" +
+          "          <href>https://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href>\n" +
+          "        </Icon>\n" +
+          "        <hotSpot x=\"32\" y=\"1\" xunits=\"pixels\" yunits=\"pixels\"/>\n" +
+          "      </IconStyle>\n" +
+          "      <LabelStyle><scale>0.9</scale></LabelStyle>\n" +
+          "    </Style>\n" +
+          placemarks +
+          "\n  </Document>\n</kml>\n"
+        );
+      }
+
+      function buildCsv(list) {
+        function csvEscape(value) {
+          var s = String(value).replace(/"/g, '""');
+          return '"' + s + '"';
+        }
+        var rows = [
+          ["Name", "Latitude", "Longitude", "Access", "Targets", "Baits", "Season", "Notes", "Google Maps URL"].join(",")
+        ];
+        list.forEach(function (spot) {
+          rows.push(
+            [
+              csvEscape(spot.name),
+              spot.lat,
+              spot.lng,
+              csvEscape(spot.access),
+              csvEscape(spot.targets.join("; ")),
+              csvEscape(spot.baits.join("; ")),
+              csvEscape(spot.season),
+              csvEscape(spot.why),
+              csvEscape(googleMapsUrl(spot))
+            ].join(",")
+          );
+        });
+        return rows.join("\n") + "\n";
+      }
+
+      function popupHtml(spot) {
+        var meta = spotMetaLine(spot);
+        var baits = (spot.baits || []).filter(meaningfulMetaPart);
+        return (
+          '<div class="popup-title">' + spot.name + "</div>" +
+          '<div class="popup-scroll">' +
+          (meta ? "<div>" + meta + "</div>" : "") +
+          (baits.length
+            ? "<div class=\"popup-baits\"><strong>Baits:</strong> " + baits.join(", ") + "</div>"
+            : "") +
+          (spot.why && spot.why !== "—"
+            ? "<div class=\"popup-baits\" style=\"margin-top:0.35rem\">" + spot.why + "</div>"
+            : "") +
+          (spot.history
+            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.history + "</em></div>"
+            : "") +
+          "</div>" +
+          '<div style="margin-top:0.55rem"><a class="gmaps-btn" target="_blank" rel="noopener" href="' +
+          googleMapsUrl(spot) +
+            '">Open pin in Google Maps</a></div>'
+        );
+      }
+
+      function meaningfulMetaPart(value) {
+        var t = String(value || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!t) return false;
+        if (/^(kml|—|-|–|_|n\/a|na|none|null|undefined)$/i.test(t)) return false;
+        return true;
+      }
+
+      function spotMetaLine(spot) {
+        var parts = [];
+        if (meaningfulMetaPart(spot.access)) parts.push(spot.access);
+        (spot.targets || []).forEach(function (t) {
+          if (meaningfulMetaPart(t)) parts.push(t);
+        });
+        return parts.join(" · ");
+      }
+
+      function hideMapNote() {
+        var note = document.getElementById("map-note");
+        if (note) note.classList.remove("show");
+      }
+
+      function showMapNote(spot) {
+        var note = document.getElementById("map-note");
+        var title = document.getElementById("map-note-title");
+        var metaEl = document.getElementById("map-note-meta");
+        var body = document.getElementById("map-note-body");
+        if (!note || !title || !metaEl || !body) return;
+
+        var meta = spotMetaLine(spot);
+        var baits = (spot.baits || []).filter(meaningfulMetaPart);
+        title.textContent = spot.name;
+        metaEl.textContent = meta || "Drag to move · scroll for more";
+        body.innerHTML =
+          (baits.length
+            ? '<div class="popup-baits"><strong>Baits:</strong> ' + baits.join(", ") + "</div>"
+            : "") +
+          (spot.why && spot.why !== "—"
+            ? '<div class="popup-baits" style="margin-top:0.35rem">' + spot.why + "</div>"
+            : "") +
+          (spot.history
+            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.history + "</em></div>"
+            : "") +
+          (spot.season && meaningfulMetaPart(spot.season)
+            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.season + "</em></div>"
+            : "") +
+          '<div class="map-note-actions">' +
+          '<a class="gmaps-btn" target="_blank" rel="noopener" href="' +
+          googleMapsUrl(spot) +
+          '">Open pin in Maps</a>' +
+          '<button type="button" class="gmaps-btn copy-coords" data-lat="' +
+          spot.lat +
+          '" data-lng="' +
+          spot.lng +
+          '">Copy coords</button>' +
+          "</div>";
+
+        body.scrollTop = 0;
+        // Default position near top-left of map each open (still draggable)
+        note.style.left = "12px";
+        note.style.top = "48px";
+        note.style.right = "auto";
+        note.style.bottom = "auto";
+        note.classList.add("show");
+        if (typeof L !== "undefined" && L.DomEvent) {
+          L.DomEvent.disableClickPropagation(note);
+          L.DomEvent.disableScrollPropagation(note);
+        }
+      }
+
+      function setupMapNoteInteractions() {
+        var note = document.getElementById("map-note");
+        var handle = document.getElementById("map-note-handle");
+        var body = document.getElementById("map-note-body");
+        var closeBtn = document.getElementById("map-note-close");
+        var shell = document.querySelector(".map-shell");
+        if (!note || !handle || !shell) return;
+
+        function shieldFromLeaflet(el) {
+          if (!el || typeof L === "undefined" || !L.DomEvent) return;
+          L.DomEvent.disableClickPropagation(el);
+          L.DomEvent.disableScrollPropagation(el);
+        }
+        shieldFromLeaflet(note);
+        shieldFromLeaflet(handle);
+        shieldFromLeaflet(body);
+
+        if (closeBtn) {
+          closeBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            hideMapNote();
+          });
+        }
+
+        var dragging = false;
+        var startX = 0;
+        var startY = 0;
+        var origLeft = 0;
+        var origTop = 0;
+
+        function pointFromEvent(e) {
+          if (e.touches && e.touches.length) return e.touches[0];
+          if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0];
+          return e;
+        }
+
+        function onDragStart(e) {
+          if (e.target.closest && e.target.closest(".map-note-close")) return;
+          dragging = true;
+          var point = pointFromEvent(e);
+          startX = point.clientX;
+          startY = point.clientY;
+          var rect = note.getBoundingClientRect();
+          var shellRect = shell.getBoundingClientRect();
+          origLeft = rect.left - shellRect.left;
+          origTop = rect.top - shellRect.top;
+          note.style.left = origLeft + "px";
+          note.style.top = origTop + "px";
+          note.style.right = "auto";
+          note.style.bottom = "auto";
+          note.classList.add("dragging");
+          if (map && map.dragging) map.dragging.disable();
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
+
+        function onDragMove(e) {
+          if (!dragging) return;
+          var point = pointFromEvent(e);
+          var shellRect = shell.getBoundingClientRect();
+          var noteW = note.offsetWidth;
+          var noteH = note.offsetHeight;
+          var nextLeft = origLeft + (point.clientX - startX);
+          var nextTop = origTop + (point.clientY - startY);
+          var maxLeft = Math.max(8, shellRect.width - noteW - 8);
+          var maxTop = Math.max(8, shellRect.height - Math.min(noteH, shellRect.height - 16) - 8);
+          nextLeft = Math.max(8, Math.min(maxLeft, nextLeft));
+          nextTop = Math.max(8, Math.min(maxTop, nextTop));
+          note.style.left = nextLeft + "px";
+          note.style.top = nextTop + "px";
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
+
+        function onDragEnd(e) {
+          if (!dragging) return;
+          dragging = false;
+          note.classList.remove("dragging");
+          if (map && map.dragging) map.dragging.enable();
+          if (e && e.stopPropagation) e.stopPropagation();
+        }
+
+        handle.addEventListener("mousedown", onDragStart);
+        window.addEventListener("mousemove", onDragMove);
+        window.addEventListener("mouseup", onDragEnd);
+
+        if ("ontouchstart" in window) {
+          handle.addEventListener("touchstart", onDragStart, { passive: false });
+          window.addEventListener("touchmove", onDragMove, { passive: false });
+          window.addEventListener("touchend", onDragEnd, { passive: false });
+          window.addEventListener("touchcancel", onDragEnd, { passive: false });
+        } else if (window.PointerEvent) {
+          handle.addEventListener("pointerdown", onDragStart, { passive: false });
+          window.addEventListener("pointermove", onDragMove, { passive: false });
+          window.addEventListener("pointerup", onDragEnd, { passive: false });
+          window.addEventListener("pointercancel", onDragEnd, { passive: false });
+        }
+
+        // Keep body scroll from moving the map underneath
+        if (body) {
+          body.addEventListener(
+            "touchstart",
+            function (e) {
+              e.stopPropagation();
+            },
+            { passive: true }
+          );
+          body.addEventListener(
+            "touchmove",
+            function (e) {
+              e.stopPropagation();
+            },
+            { passive: true }
+          );
+          body.addEventListener(
+            "wheel",
+            function (e) {
+              e.stopPropagation();
+            },
+            { passive: true }
+          );
+        }
+      }
+
+      setupMapNoteInteractions();
+
+      function renderList() {
+        var list = document.getElementById("spot-list");
+        list.innerHTML = "";
+        var scrollBox = document.getElementById("info-scroll");
+        if (scrollBox) scrollBox.scrollTop = 0;
+        hideMapNote();
+
+        if (map) {
+          Object.keys(markersById).forEach(function (id) {
+            map.removeLayer(markersById[id]);
+          });
+        }
+        markersById = {};
+
+        var visible = visibleSpots();
+        var countEl = document.getElementById("info-window-count");
+        if (countEl) {
+          countEl.textContent = visible.length + " spot" + (visible.length === 1 ? "" : "s");
+        }
+        var bounds = [];
+
+        if (!visible.length) {
+          list.innerHTML =
+            '<p style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-size:0.85rem;color:#527062;padding:0.5rem;">No spots match this filter.</p>';
+          return;
+        }
+
+        visible.forEach(function (spot, spotIndex) {
+          var marker = null;
+          if (map && typeof L !== "undefined") {
+            marker = L.marker([spot.lat, spot.lng]).addTo(map);
+            marker.on("click", function () {
+              showMapNote(spot);
+            });
+            markersById[spot.id] = marker;
+            bounds.push([spot.lat, spot.lng]);
+          }
+
+          var card = document.createElement("article");
+          card.className = "spot-card";
+          card.dataset.id = spot.id;
+          var meta = spotMetaLine(spot);
+          var baits = (spot.baits || []).filter(meaningfulMetaPart);
+          var pinNum = spot.pinNumber || spotIndex + 1;
+          card.innerHTML =
+            (meta ? '<div class="spot-meta">' + meta + "</div>" : "") +
+            "<h3>" + spot.name + "</h3>" +
+            '<div class="spot-body">' +
+            (spot.why && spot.why !== "—" ? "<p>" + spot.why + "</p>" : "") +
+            (baits.length
+              ? '<div class="baits">' +
+                baits
+                  .map(function (b) {
+                    return '<span class="bait">' + b + "</span>";
+                  })
+                  .join("") +
+                "</div>"
+              : "") +
+            (spot.season && meaningfulMetaPart(spot.season)
+              ? '<p style="margin-top:0.45rem;font-size:0.75rem;opacity:0.85"><em>' +
+                spot.season +
+                "</em></p>"
+              : "") +
+            (spot.history
+              ? '<p style="margin-top:0.25rem;font-size:0.75rem;opacity:0.85"><em>' +
+                spot.history +
+                "</em></p>"
+              : "") +
+            "</div>" +
+            '<div class="spot-actions">' +
+            '<a class="gmaps-btn" target="_blank" rel="noopener" href="' +
+            googleMapsUrl(spot) +
+            '">Open pin in Maps</a>' +
+            '<button type="button" class="gmaps-btn copy-coords" data-lat="' +
+            spot.lat +
+            '" data-lng="' +
+            spot.lng +
+            '">Copy coords</button>' +
+            (usingCustomKml
+              ? '<button type="button" class="gmaps-btn export-gpx" data-id="' +
+                spot.id +
+                '" data-pin="' +
+                pinNum +
+                '">Export GPX</button>'
+              : "") +
+            "</div>" +
+            '<div class="expand-hint">Tap to expand</div>';
+
+          card.addEventListener("click", function (e) {
+            if (e.target.closest("a, button")) return;
+            var wasExpanded = card.classList.contains("expanded");
+            var hint = card.querySelector(".expand-hint");
+            document.querySelectorAll(".spot-card").forEach(function (el) {
+              el.classList.remove("active", "expanded");
+              var otherHint = el.querySelector(".expand-hint");
+              if (otherHint) otherHint.textContent = "Tap to expand";
+            });
+            if (!wasExpanded) {
+              card.classList.add("active", "expanded");
+              if (hint) hint.textContent = "Tap to collapse";
+              card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            } else if (hint) {
+              hint.textContent = "Tap to expand";
+            }
+          });
+
+          list.appendChild(card);
+        });
+
+        if (map && bounds.length) {
+          if (bounds.length > 1) {
+            map.fitBounds(bounds, { padding: [40, 40] });
+          } else {
+            map.setView(bounds[0], 13);
+          }
+          setTimeout(function () {
+            map.invalidateSize();
+          }, 200);
+        }
+      }
+
+      document.getElementById("btn-compiled").addEventListener("click", function () {
+        showCompiledSites();
+      });
+
+      document.getElementById("btn-torwich").addEventListener("click", function () {
+        showTorwichSites();
+      });
+
+      (function setupViewModes() {
+        var layout = document.querySelector(".layout");
+        var sitesBtn = document.getElementById("sites-size-btn");
+        var mapBtn = document.getElementById("map-expand-btn");
+        var viewBar = document.getElementById("view-bar");
+        if (!layout) return;
+
+        function currentMode() {
+          if (layout.classList.contains("map-full")) return "map";
+          if (layout.classList.contains("sites-full")) return "list";
+          if (layout.classList.contains("sites-large")) return "large";
+          return "split";
+        }
+
+        function applyMode(mode) {
+          layout.classList.remove("sites-large", "sites-full", "map-full");
+          if (mode === "map") layout.classList.add("map-full");
+          if (mode === "list") layout.classList.add("sites-full");
+          if (mode === "large") layout.classList.add("sites-large");
+
+          if (viewBar) {
+            viewBar.querySelectorAll("button").forEach(function (b) {
+              var v = b.getAttribute("data-view");
+              var active =
+                (mode === "split" && v === "split") ||
+                (mode === "map" && v === "map") ||
+                (mode === "list" && v === "list") ||
+                (mode === "large" && v === "list");
+              b.classList.toggle("active", active);
+            });
+          }
+
+          if (sitesBtn) {
+            if (mode === "list") {
+              sitesBtn.textContent = "Show map";
+              sitesBtn.setAttribute("aria-pressed", "true");
+            } else if (mode === "large") {
+              sitesBtn.textContent = "Full list";
+              sitesBtn.setAttribute("aria-pressed", "true");
+            } else {
+              sitesBtn.textContent = "Expand list";
+              sitesBtn.setAttribute("aria-pressed", "false");
+            }
+          }
+
+          if (mapBtn) {
+            if (mode === "map") {
+              mapBtn.textContent = "Show list";
+            } else {
+              mapBtn.textContent = "Expand map";
+            }
+          }
+
+          if (map) {
+            setTimeout(function () {
+              map.invalidateSize();
+            }, 220);
+          }
+        }
+
+        window.setViewMode = applyMode;
+
+        if (viewBar) {
+          viewBar.addEventListener("click", function (e) {
+            var btn = e.target.closest("button[data-view]");
+            if (!btn) return;
+            applyMode(btn.getAttribute("data-view"));
+          });
+        }
+
+        if (sitesBtn) {
+          sitesBtn.addEventListener("click", function () {
+            var mode = currentMode();
+            if (mode === "list") applyMode("split");
+            else if (mode === "large") applyMode("list");
+            else applyMode("list");
+          });
+        }
+
+        if (mapBtn) {
+          mapBtn.addEventListener("click", function () {
+            var mode = currentMode();
+            if (mode === "map") applyMode("split");
+            else applyMode("map");
+          });
+        }
+      })();
+
+      document.getElementById("clear-torwich").addEventListener("click", function () {
+        clearTorwichData();
+      });
+
+      document.getElementById("kml-file").addEventListener("change", function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) {
+          if (!torwichSpots) setSourceButtons("compiled");
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var parsed = parseKml(String(reader.result || ""));
+            applyCustomSpots(parsed, file.name);
+          } catch (err) {
+            alert(err.message || String(err));
+            if (!torwichSpots) setSourceButtons("compiled");
+          }
+          e.target.value = "";
+        };
+        reader.onerror = function () {
+          alert("Could not read that file.");
+          if (!torwichSpots) setSourceButtons("compiled");
+          e.target.value = "";
+        };
+        reader.readAsText(file);
+      });
+
+      document.addEventListener("click", function (e) {
+        var gpxBtn = e.target.closest(".export-gpx");
+        if (gpxBtn) {
+          e.stopPropagation();
+          var id = gpxBtn.getAttribute("data-id");
+          var spot = null;
+          for (var i = 0; i < spots.length; i++) {
+            if (spots[i].id === id) {
+              spot = spots[i];
+              break;
+            }
+          }
+          if (!spot) {
+            alert("Could not find that Guide Site.");
+            return;
+          }
+          var pinNum =
+            parseInt(gpxBtn.getAttribute("data-pin"), 10) ||
+            spot.pinNumber ||
+            1;
+          downloadFile(
+            "P" + pinNum + "-GPX.gpx",
+            buildGpxForSpot(spot),
+            "application/gpx+xml"
+          );
+          return;
+        }
+
+        var btn = e.target.closest(".copy-coords");
+        if (!btn) return;
+        e.stopPropagation();
+        var coords = btn.getAttribute("data-lat") + ", " + btn.getAttribute("data-lng");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(coords).then(
+            function () {
+              btn.textContent = "Copied!";
+              setTimeout(function () {
+                btn.textContent = "Copy coords";
+              }, 1200);
+            },
+            function () {
+              window.prompt("Copy coordinates:", coords);
+            }
+          );
+        } else {
+          window.prompt("Copy coordinates:", coords);
+        }
+      });
+
+      updateSourceUI();
+      renderList();
+
+      (function setupLiveConditions() {
+        var TRAVIS_FULL_FT = 681; // LCRA conservation-pool “full” (reservoir datum)
+        var USGS_URL =
+          "https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08154500&parameterCd=00062";
+        var WEATHER_URL =
+          "https://api.open-meteo.com/v1/forecast?latitude=30.39&longitude=-97.91" +
+          "&current=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code" +
+          "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago";
+
+        var levelEl = document.getElementById("live-level");
+        var vsEl = document.getElementById("live-vs-full");
+        var weatherEl = document.getElementById("live-weather");
+        var windEl = document.getElementById("live-wind");
+        var tipEl = document.getElementById("live-tip");
+        var refreshBtn = document.getElementById("live-refresh");
+        if (!levelEl || !tipEl) return;
+
+        function windDirLabel(deg) {
+          var dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+          if (!isFinite(deg)) return "";
+          return dirs[Math.round(deg / 45) % 8];
+        }
+
+        function weatherLabel(code) {
+          var map = {
+            0: "Clear",
+            1: "Mainly clear",
+            2: "Partly cloudy",
+            3: "Overcast",
+            45: "Fog",
+            48: "Fog",
+            51: "Drizzle",
+            61: "Rain",
+            63: "Rain",
+            65: "Heavy rain",
+            71: "Snow",
+            80: "Showers",
+            95: "Thunderstorm"
+          };
+          return map[code] || "Weather";
+        }
+
+        function fishingTip(levelFt, windMph) {
+          var tips = [];
+          if (isFinite(levelFt)) {
+            var delta = levelFt - TRAVIS_FULL_FT;
+            if (delta >= 2) {
+              tips.push("Above full — flooded brush/banks can turn on in the arms.");
+            } else if (delta >= -2) {
+              tips.push("Near full pool — normal shoreline + marina edges.");
+            } else if (delta >= -10) {
+              tips.push("A bit below full — fish points/drop-offs; less flooded brush.");
+            } else {
+              tips.push("Well below full — focus deeper structure and main-lake points.");
+            }
+          }
+          if (isFinite(windMph)) {
+            if (windMph >= 15) tips.push("Windy — fish windblown banks; tough topwater.");
+            else if (windMph <= 4) tips.push("Light wind — clear-water finesse / dock skipping.");
+          }
+          tips.push("Public gauge data; check lake level before you bank-fish.");
+          return tips.join(" ");
+        }
+
+        function formatWhen(iso) {
+          try {
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return "";
+            return d.toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit"
+            });
+          } catch (e) {
+            return "";
+          }
+        }
+
+        function loadLive() {
+          levelEl.textContent = "Lake: loading…";
+          weatherEl.textContent = "Weather: loading…";
+          tipEl.textContent = "Updating public conditions…";
+
+          var levelFt = NaN;
+          var windMph = NaN;
+          var pending = 2;
+
+          function doneOne() {
+            pending -= 1;
+            if (pending <= 0) tipEl.textContent = fishingTip(levelFt, windMph);
+          }
+
+          fetch(USGS_URL)
+            .then(function (r) {
+              if (!r.ok) throw new Error("USGS " + r.status);
+              return r.json();
+            })
+            .then(function (data) {
+              var series = data && data.value && data.value.timeSeries;
+              var first = series && series[0];
+              var vals = first && first.values && first.values[0] && first.values[0].value;
+              var latest = vals && vals[0];
+              if (!latest) throw new Error("No lake reading");
+              levelFt = parseFloat(latest.value);
+              var when = formatWhen(latest.dateTime);
+              levelEl.textContent =
+                "Lake: " + levelFt.toFixed(2) + " ft" + (when ? " (" + when + ")" : "");
+              if (vsEl) {
+                var delta = levelFt - TRAVIS_FULL_FT;
+                var sign = delta >= 0 ? "+" : "";
+                vsEl.textContent =
+                  "vs full (681): " + sign + delta.toFixed(1) + " ft";
+              }
+            })
+            .catch(function () {
+              levelEl.textContent = "Lake: unavailable";
+              if (vsEl) vsEl.textContent = "vs full: —";
+            })
+            .then(doneOne);
+
+          fetch(WEATHER_URL)
+            .then(function (r) {
+              if (!r.ok) throw new Error("Weather " + r.status);
+              return r.json();
+            })
+            .then(function (data) {
+              var cur = data && data.current;
+              if (!cur) throw new Error("No weather");
+              var temp = cur.temperature_2m;
+              windMph = cur.wind_speed_10m;
+              var dir = windDirLabel(cur.wind_direction_10m);
+              weatherEl.textContent =
+                "Air: " +
+                (isFinite(temp) ? Math.round(temp) + "°F" : "—") +
+                " · " +
+                weatherLabel(cur.weather_code);
+              if (windEl) {
+                windEl.textContent =
+                  "Wind: " +
+                  (isFinite(windMph) ? Math.round(windMph) + " mph" : "—") +
+                  (dir ? " " + dir : "");
+              }
+            })
+            .catch(function () {
+              weatherEl.textContent = "Weather: unavailable";
+              if (windEl) windEl.textContent = "Wind: —";
+            })
+            .then(doneOne);
+        }
+
+        if (refreshBtn) refreshBtn.addEventListener("click", loadLive);
+        loadLive();
+        setInterval(loadLive, 15 * 60 * 1000);
+      })();
+    </script>
+  </body>
+</html>
