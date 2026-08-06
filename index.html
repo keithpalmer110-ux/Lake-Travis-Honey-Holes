@@ -802,19 +802,6 @@
         margin: 0;
       }
 
-      ul.spot-summary-list {
-        margin: 0.15rem 0 0;
-        padding-left: 1.1rem;
-        list-style: disc;
-      }
-
-      ul.spot-summary-list li {
-        font-size: 0.82rem;
-        color: #355045;
-        line-height: 1.35;
-        margin: 0.2rem 0;
-      }
-
       .bait {
         font-size: 0.7rem;
         background: rgba(31, 77, 58, 0.16);
@@ -1231,7 +1218,7 @@
           <p class="import-status" id="import-status">
             Showing <em>Travis Bass Sites</em>. Tap <em>Choose Guide KML…</em> to load a file.
           </p>
-          <p class="build-stamp" id="build-stamp">Build 8/6 · bullets</p>
+          <p class="build-stamp" id="build-stamp">Build 8/6 · paragraph</p>
           <div class="live-bar" id="live-bar" aria-live="polite">
             <strong>Live conditions</strong>
             <div class="live-grid" id="live-grid">
@@ -1561,13 +1548,13 @@
             spots.length +
             " pins)" +
             (customKmlName ? " from <em>" + customKmlName + "</em>" : "") +
-            ". Expand a pin for Summary bullets + Baits.";
+            ".";
           document.getElementById("info-window-title").textContent = "Guide Sites";
           if (clearBtn) clearBtn.hidden = false;
         } else {
           setSourceButtons("compiled");
           status.innerHTML =
-            "Showing <em>Travis Bass Sites</em> — boat bass (includes white bass). After a refresh, tap <em>Choose Guide KML…</em> again to reload Guide pins.";
+            "Showing <em>Travis Bass Sites</em> — boat bass (includes white bass).";
           document.getElementById("info-window-title").textContent = "Travis Bass Sites";
           if (clearBtn) clearBtn.hidden = !torwichSpots;
         }
@@ -1580,19 +1567,11 @@
       }
 
       function stripHtml(html) {
-        var prepared = String(html || "")
-          .replace(/<\s*br\s*\/?\s*>/gi, "\n")
-          .replace(/<\/\s*(p|div|tr|li|h[1-6])\s*>/gi, "\n")
-          .replace(/<\s*li[^>]*>/gi, "• ")
-          .replace(/<\s*\/?\s*td[^>]*>/gi, " | ");
         var tmp = document.createElement("div");
-        tmp.innerHTML = prepared;
+        tmp.innerHTML = html;
         return (tmp.textContent || tmp.innerText || "")
           .replace(/\u00a0/g, " ")
-          .replace(/[ \t]+\n/g, "\n")
-          .replace(/\n[ \t]+/g, "\n")
-          .replace(/[ \t]{2,}/g, " ")
-          .replace(/\n{3,}/g, "\n\n")
+          .replace(/\s+/g, " ")
           .trim();
       }
 
@@ -1691,78 +1670,40 @@
 
       // Guide notes usually put baits under a "Label:" header (Baits:, Lures:, etc.)
       var BAIT_LABEL_RE =
-        /(?:^|[\n\r])\s*((?:baits?|lures?|lure suggestions?|suggested baits?|presentations?|rigs?|tackle|soft plastics?|hard baits?)\s*:)\s*/i;
+        /(?:^|[\n\r]|\s)((?:baits?|lures?|lure suggestions?|suggested baits?|presentations?|rigs?|tackle|soft plastics?|hard baits?)\s*:)\s*/i;
 
       function parseBaitsFromText(text) {
         return parseGuideNote(text).baits;
       }
 
-      function guideInfoBullets(raw) {
+      function summarizeGuideText(raw) {
         var text = String(raw || "")
           .replace(/\u00a0/g, " ")
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n")
+          .replace(/\s+/g, " ")
           .trim();
-        if (!text) return [];
-
-        var bullets = [];
-        var seen = {};
-
-        function addBullet(item) {
-          var t = String(item || "")
-            .replace(/[ \t]+/g, " ")
-            .replace(/^[\-•*]\s+/, "")
-            .replace(/^\d{1,2}[\.\)\:\-]\s+/, "")
-            .trim();
-          if (!t) return;
-          // Skip empty Label: lines and bait headers
-          if (/^[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:$/.test(t)) return;
-          if (/^(baits?|lures?|presentations?|rigs?|tackle)\s*:?$/i.test(t)) return;
-          if (t.length < 2) return;
-          var key = t.toLowerCase();
-          if (seen[key]) return;
-          seen[key] = true;
-          if (t.length > 160) {
-            t = t.slice(0, 157).replace(/\s+\S*$/, "") + "…";
-          }
-          bullets.push(t);
+        if (!text) return "";
+        // Drop leftover empty "Label:" fragments
+        text = text
+          .replace(/\b[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:\s*(?=$)/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!text) return "";
+        var sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+        var summary = "";
+        for (var i = 0; i < sentences.length && i < 3; i++) {
+          var next = (summary + " " + sentences[i]).trim();
+          if (i > 0 && next.length > 320) break;
+          summary = next;
         }
-
-        // Prefer line breaks / Label: Value blocks
-        var lines = text.split(/\n+/);
-        var usedLines = false;
-        lines.forEach(function (line) {
-          line = line.trim();
-          if (!line) return;
-          // Split "A. foo. B. bar." style rare; keep Label: value as one bullet
-          if (/^[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:\s+\S/.test(line)) {
-            usedLines = true;
-            addBullet(line);
-            return;
-          }
-          if (lines.length > 1) {
-            usedLines = true;
-            // Long line → sentence bullets
-            if (line.length > 120 && /[.!?]/.test(line)) {
-              (line.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [line]).forEach(addBullet);
-            } else {
-              addBullet(line);
-            }
-          }
-        });
-
-        if (!usedLines || !bullets.length) {
-          var flat = text.replace(/\s+/g, " ").trim();
-          var sentences = flat.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [flat];
-          sentences.forEach(addBullet);
+        if (summary.length > 360) {
+          summary = summary.slice(0, 357).replace(/\s+\S*$/, "") + "…";
         }
-
-        return bullets.slice(0, 8);
+        return summary;
       }
 
       function parseGuideNote(text) {
         var raw = String(text || "").replace(/\u00a0/g, " ").trim();
-        if (!raw) return { summaryBullets: [], baits: [], whyFull: "" };
+        if (!raw) return { summary: "", baits: [], whyFull: "" };
 
         var baitMatch = raw.match(BAIT_LABEL_RE);
         var before = raw;
@@ -1773,34 +1714,27 @@
           baitSection = raw.slice(baitMatch.index + baitMatch[0].length);
           // Stop bait block at the next "Word:" header (non-bait), if any
           var nextLabel = baitSection.match(
-            /(?:^|[\n\r])\s*[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:/
+            /(?:^|[\n\r]|\s)([A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:)/
           );
-          if (nextLabel && typeof nextLabel.index === "number" && nextLabel.index > 0) {
-            var maybeLabel = nextLabel[0].replace(/^[\n\r\s]+/, "");
-            if (!BAIT_LABEL_RE.test("\n" + maybeLabel)) {
-              before = (before + "\n" + baitSection.slice(nextLabel.index)).trim();
+          if (nextLabel && typeof nextLabel.index === "number" && nextLabel.index > 8) {
+            var maybeLabel = nextLabel[1] || nextLabel[0];
+            if (!BAIT_LABEL_RE.test(" " + maybeLabel)) {
+              before = (before + " " + baitSection.slice(nextLabel.index)).trim();
               baitSection = baitSection.slice(0, nextLabel.index).trim();
             }
           }
-        } else {
+        } else if (/\d{1,2}[\.\)\:]\s+\S/.test(raw)) {
           // No Baits:/Lures: header — use numbered list if present
-          if (/\d{1,2}[\.\)\:]\s+\S/.test(raw)) {
-            baitSection = raw;
-            before = "";
-          }
+          baitSection = raw;
+          before = "";
         }
 
         var baits = baitSection ? splitBaitsList(baitSection) : [];
-        var summaryBullets = guideInfoBullets(before);
-        if (!summaryBullets.length && !baits.length && raw) {
-          summaryBullets = guideInfoBullets(raw);
+        var summary = summarizeGuideText(before);
+        if (!summary && !baits.length && raw) {
+          summary = summarizeGuideText(raw);
         }
-        return {
-          summaryBullets: summaryBullets,
-          summary: summaryBullets.join(" "),
-          baits: baits,
-          whyFull: raw
-        };
+        return { summary: summary, baits: baits, whyFull: raw };
       }
 
       function parseKml(xmlText) {
@@ -1826,17 +1760,15 @@
 
           var rawName = textContentOf(pm, "name");
           var name = rawName.replace(/\s+/g, " ").trim();
-          if (
+          var untitled =
             !name ||
             /^untitled$/i.test(name) ||
             /^unnamed$/i.test(name) ||
-            /^new placemark$/i.test(name)
-          ) {
-            name = "Pin " + (parsed.length + 1);
-          }
+            /^new placemark$/i.test(name) ||
+            /^pin\s*\d+\s*$/i.test(name);
+          // Always 1..n in load order so GPX / list numbers stay consistent
           var pinNumber = parsed.length + 1;
-          var pinFromName = name.match(/^pin\s*(\d+)\s*$/i);
-          if (pinFromName) pinNumber = parseInt(pinFromName[1], 10);
+          if (untitled) name = "Pin " + pinNumber;
           var descRaw = "";
           var descNodes = pm.getElementsByTagName("description");
           if (descNodes.length) {
@@ -1882,7 +1814,6 @@
             targets: targets,
             season: season,
             why: guideNote.summary || "",
-            summaryBullets: guideNote.summaryBullets || [],
             whyFull: descText,
             baits: baits,
             history: ""
@@ -2120,22 +2051,16 @@
         opts = opts || {};
         var baits = (spot.baits || []).filter(meaningfulMetaPart);
         var why = spot.why && spot.why !== "—" ? spot.why : "";
-        var bullets = (spot.summaryBullets || []).filter(meaningfulMetaPart);
         var isGuide = !!usingCustomKml;
         var html = "";
 
         if (isGuide) {
-          if (!bullets.length && why) bullets = [why];
-          if (bullets.length) {
+          if (why) {
             html +=
               '<div class="section-label">Summary</div>' +
-              '<ul class="spot-summary-list">' +
-              bullets
-                .map(function (b) {
-                  return "<li>" + b + "</li>";
-                })
-                .join("") +
-              "</ul>";
+              '<p class="spot-summary">' +
+              why +
+              "</p>";
           }
           if (baits.length) {
             html +=
