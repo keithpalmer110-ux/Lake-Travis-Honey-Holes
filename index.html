@@ -169,11 +169,6 @@
         text-overflow: ellipsis;
       }
 
-      .live-tip {
-        margin-top: 0.3rem;
-        color: #355045;
-      }
-
       .live-bar a {
         color: var(--water);
         font-weight: 700;
@@ -775,6 +770,27 @@
         display: flex;
         flex-wrap: wrap;
         gap: 0.3rem;
+      }
+
+      .section-label {
+        margin-top: 0.55rem;
+        margin-bottom: 0.2rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #5a7268;
+      }
+
+      .section-label:first-child {
+        margin-top: 0;
+      }
+
+      .spot-summary {
+        font-size: 0.82rem;
+        color: #355045;
+        line-height: 1.35;
+        margin: 0;
       }
 
       .bait {
@@ -1642,25 +1658,79 @@
           .filter(Boolean);
       }
 
+      // Guide notes usually put baits under a "Label:" header (Baits:, Lures:, etc.)
+      var BAIT_LABEL_RE =
+        /(?:^|[\n\r])\s*((?:baits?|lures?|lure suggestions?|suggested baits?|presentations?|rigs?|tackle|soft plastics?|hard baits?)\s*:)\s*/i;
+
       function parseBaitsFromText(text) {
-        if (!text) return [];
-        var section = "";
-        // Multi-line "Baits:" block through next blank line / next Label:
-        var block = text.match(
-          /baits?\s*:\s*([\s\S]*?)(?=\n\s*[A-Za-z][A-Za-z Sp]*\s*:|\n\s*\n|$)/i
-        );
-        if (block) {
-          section = block[1];
+        return parseGuideNote(text).baits;
+      }
+
+      function summarizeGuideText(raw) {
+        var text = String(raw || "")
+          .replace(/\u00a0/g, " ")
+          .replace(/[ \t]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+        if (!text) return "";
+        // Drop leftover "Label:" lines with no content
+        text = text
+          .replace(/(?:^|\n)\s*[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:\s*(?=\n|$)/g, "\n")
+          .replace(/\n{2,}/g, "\n")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!text) return "";
+        var sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+        var summary = "";
+        for (var i = 0; i < sentences.length && i < 2; i++) {
+          var next = (summary + " " + sentences[i]).trim();
+          if (i > 0 && next.length > 220) break;
+          summary = next;
+        }
+        if (summary.length > 240) {
+          summary = summary.slice(0, 237).replace(/\s+\S*$/, "") + "…";
+        }
+        return summary;
+      }
+
+      function parseGuideNote(text) {
+        var raw = String(text || "").replace(/\u00a0/g, " ").trim();
+        if (!raw) return { summary: "", baits: [], whyFull: "" };
+
+        var baitMatch = raw.match(BAIT_LABEL_RE);
+        var before = raw;
+        var baitSection = "";
+
+        if (baitMatch && typeof baitMatch.index === "number") {
+          before = raw.slice(0, baitMatch.index).trim();
+          baitSection = raw.slice(baitMatch.index + baitMatch[0].length);
+          // Stop bait block at the next "Word:" header (non-bait), if any
+          var nextLabel = baitSection.match(
+            /(?:^|[\n\r])\s*[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:/
+          );
+          if (nextLabel && typeof nextLabel.index === "number" && nextLabel.index > 0) {
+            var maybeLabel = nextLabel[0].replace(/^[\n\r\s]+/, "");
+            if (!BAIT_LABEL_RE.test("\n" + maybeLabel)) {
+              before = (before + "\n" + baitSection.slice(nextLabel.index)).trim();
+              baitSection = baitSection.slice(0, nextLabel.index).trim();
+            }
+          }
         } else {
-          var line = text.match(/baits?\s*:\s*([^\n\r]+)/i);
-          if (line) section = line[1];
+          // No Baits:/Lures: header — use numbered list if present
+          if (/\d{1,2}[\.\)\:]\s+\S/.test(raw)) {
+            baitSection = raw;
+            before = "";
+          }
         }
-        // If no Baits: header, still try numbered list anywhere in the note
-        if (!section) {
-          if (/\d{1,2}[\.\)\:]\s+\S/.test(text)) section = text;
-          else return [];
+
+        var baits = baitSection ? splitBaitsList(baitSection) : [];
+        // If bait chips still empty but section had comma text, keep split result
+        var summary = summarizeGuideText(before);
+        // If summary empty and we pulled baits from whole note, leave summary blank
+        if (!summary && !baits.length && raw) {
+          summary = summarizeGuideText(raw);
         }
-        return splitBaitsList(section);
+        return { summary: summary, baits: baits, whyFull: raw };
       }
 
       function parseKml(xmlText) {
@@ -1722,9 +1792,10 @@
             extendedDataValue(pm, "baits") ||
             extendedDataValue(pm, "Baits") ||
             "";
+          var guideNote = parseGuideNote(descText);
           var baits = baitsRaw
             ? splitBaitsList(baitsRaw)
-            : parseBaitsFromText(descText);
+            : guideNote.baits;
 
           var season =
             extendedDataValue(pm, "season") ||
@@ -1740,7 +1811,8 @@
             access: access,
             targets: targets,
             season: season,
-            why: descText,
+            why: guideNote.summary || "",
+            whyFull: descText,
             baits: baits,
             history: ""
           });
@@ -1973,22 +2045,68 @@
         return rows.join("\n") + "\n";
       }
 
+      function spotDetailHtml(spot, opts) {
+        opts = opts || {};
+        var baits = (spot.baits || []).filter(meaningfulMetaPart);
+        var why = spot.why && spot.why !== "—" ? spot.why : "";
+        var isGuide = !!usingCustomKml;
+        var html = "";
+
+        if (isGuide) {
+          if (why) {
+            html +=
+              '<div class="section-label">Summary</div>' +
+              '<p class="spot-summary">' +
+              why +
+              "</p>";
+          }
+          if (baits.length) {
+            html +=
+              '<div class="section-label">Baits</div>' +
+              '<div class="baits">' +
+              baits
+                .map(function (b) {
+                  return '<span class="bait">' + b + "</span>";
+                })
+                .join("") +
+              "</div>";
+          }
+        } else {
+          if (why) html += "<p>" + why + "</p>";
+          if (baits.length) {
+            html +=
+              '<div class="baits">' +
+              baits
+                .map(function (b) {
+                  return '<span class="bait">' + b + "</span>";
+                })
+                .join("") +
+              "</div>";
+          }
+        }
+
+        if (spot.season && meaningfulMetaPart(spot.season)) {
+          html +=
+            '<p style="margin-top:0.45rem;font-size:0.75rem;opacity:0.85"><em>' +
+            spot.season +
+            "</em></p>";
+        }
+        if (spot.history) {
+          html +=
+            '<p style="margin-top:0.25rem;font-size:0.75rem;opacity:0.85"><em>' +
+            spot.history +
+            "</em></p>";
+        }
+        return html;
+      }
+
       function popupHtml(spot) {
         var meta = spotMetaLine(spot);
-        var baits = (spot.baits || []).filter(meaningfulMetaPart);
         return (
           '<div class="popup-title">' + spot.name + "</div>" +
           '<div class="popup-scroll">' +
           (meta ? "<div>" + meta + "</div>" : "") +
-          (baits.length
-            ? "<div class=\"popup-baits\"><strong>Baits:</strong> " + baits.join(", ") + "</div>"
-            : "") +
-          (spot.why && spot.why !== "—"
-            ? "<div class=\"popup-baits\" style=\"margin-top:0.35rem\">" + spot.why + "</div>"
-            : "") +
-          (spot.history
-            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.history + "</em></div>"
-            : "") +
+          spotDetailHtml(spot) +
           "</div>" +
           '<div style="margin-top:0.55rem"><a class="gmaps-btn" target="_blank" rel="noopener" href="' +
           googleMapsUrl(spot) +
@@ -2027,22 +2145,10 @@
         if (!note || !title || !metaEl || !body) return;
 
         var meta = spotMetaLine(spot);
-        var baits = (spot.baits || []).filter(meaningfulMetaPart);
         title.textContent = spot.name;
         metaEl.textContent = meta || "Drag to move · scroll for more";
         body.innerHTML =
-          (baits.length
-            ? '<div class="popup-baits"><strong>Baits:</strong> ' + baits.join(", ") + "</div>"
-            : "") +
-          (spot.why && spot.why !== "—"
-            ? '<div class="popup-baits" style="margin-top:0.35rem">' + spot.why + "</div>"
-            : "") +
-          (spot.history
-            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.history + "</em></div>"
-            : "") +
-          (spot.season && meaningfulMetaPart(spot.season)
-            ? '<div class="popup-baits" style="margin-top:0.35rem"><em>' + spot.season + "</em></div>"
-            : "") +
+          spotDetailHtml(spot) +
           '<div class="map-note-actions">' +
           '<a class="gmaps-btn" target="_blank" rel="noopener" href="' +
           googleMapsUrl(spot) +
@@ -2236,32 +2342,12 @@
           card.className = "spot-card";
           card.dataset.id = spot.id;
           var meta = spotMetaLine(spot);
-          var baits = (spot.baits || []).filter(meaningfulMetaPart);
           var pinNum = spot.pinNumber || spotIndex + 1;
           card.innerHTML =
             (meta ? '<div class="spot-meta">' + meta + "</div>" : "") +
             "<h3>" + spot.name + "</h3>" +
             '<div class="spot-body">' +
-            (spot.why && spot.why !== "—" ? "<p>" + spot.why + "</p>" : "") +
-            (baits.length
-              ? '<div class="baits">' +
-                baits
-                  .map(function (b) {
-                    return '<span class="bait">' + b + "</span>";
-                  })
-                  .join("") +
-                "</div>"
-              : "") +
-            (spot.season && meaningfulMetaPart(spot.season)
-              ? '<p style="margin-top:0.45rem;font-size:0.75rem;opacity:0.85"><em>' +
-                spot.season +
-                "</em></p>"
-              : "") +
-            (spot.history
-              ? '<p style="margin-top:0.25rem;font-size:0.75rem;opacity:0.85"><em>' +
-                spot.history +
-                "</em></p>"
-              : "") +
+            spotDetailHtml(spot) +
             "</div>" +
             '<div class="spot-actions">' +
             '<a class="gmaps-btn" target="_blank" rel="noopener" href="' +
