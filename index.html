@@ -1201,7 +1201,6 @@
               <span id="live-weather">Weather: loading…</span>
               <span id="live-wind">Wind: —</span>
             </div>
-            <p class="live-tip" id="live-tip">Fetching lake level and local weather…</p>
             <div class="live-actions">
               <button type="button" id="live-refresh">Refresh</button>
               <a href="https://hydromet.lcra.org/" target="_blank" rel="noopener">Hydromet</a>
@@ -2506,9 +2505,8 @@
         var vsEl = document.getElementById("live-vs-full");
         var weatherEl = document.getElementById("live-weather");
         var windEl = document.getElementById("live-wind");
-        var tipEl = document.getElementById("live-tip");
         var refreshBtn = document.getElementById("live-refresh");
-        if (!levelEl || !tipEl) return;
+        if (!levelEl) return;
 
         function windDirLabel(deg) {
           var dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -2535,28 +2533,6 @@
           return map[code] || "Weather";
         }
 
-        function fishingTip(levelFt, windMph) {
-          var tips = [];
-          if (isFinite(levelFt)) {
-            var delta = levelFt - TRAVIS_FULL_FT;
-            if (delta >= 2) {
-              tips.push("Above full — flooded brush/banks can turn on in the arms.");
-            } else if (delta >= -2) {
-              tips.push("Near full pool — normal shoreline + marina edges.");
-            } else if (delta >= -10) {
-              tips.push("A bit below full — fish points/drop-offs; less flooded brush.");
-            } else {
-              tips.push("Well below full — focus deeper structure and main-lake points.");
-            }
-          }
-          if (isFinite(windMph)) {
-            if (windMph >= 15) tips.push("Windy — fish windblown banks; tough topwater.");
-            else if (windMph <= 4) tips.push("Light wind — clear-water finesse / dock skipping.");
-          }
-          tips.push("Public gauge data; check lake level before you bank-fish.");
-          return tips.join(" ");
-        }
-
         function formatWhen(iso) {
           try {
             var d = new Date(iso);
@@ -2575,16 +2551,6 @@
         function loadLive() {
           levelEl.textContent = "Lake: loading…";
           weatherEl.textContent = "Weather: loading…";
-          tipEl.textContent = "Updating public conditions…";
-
-          var levelFt = NaN;
-          var windMph = NaN;
-          var pending = 2;
-
-          function doneOne() {
-            pending -= 1;
-            if (pending <= 0) tipEl.textContent = fishingTip(levelFt, windMph);
-          }
 
           fetch(USGS_URL)
             .then(function (r) {
@@ -2597,7 +2563,7 @@
               var vals = first && first.values && first.values[0] && first.values[0].value;
               var latest = vals && vals[0];
               if (!latest) throw new Error("No lake reading");
-              levelFt = parseFloat(latest.value);
+              var levelFt = parseFloat(latest.value);
               var when = formatWhen(latest.dateTime);
               levelEl.textContent =
                 "Lake: " + levelFt.toFixed(2) + " ft" + (when ? " (" + when + ")" : "");
@@ -2611,8 +2577,7 @@
             .catch(function () {
               levelEl.textContent = "Lake: unavailable";
               if (vsEl) vsEl.textContent = "vs full: —";
-            })
-            .then(doneOne);
+            });
 
           fetch(WEATHER_URL)
             .then(function (r) {
@@ -2623,7 +2588,7 @@
               var cur = data && data.current;
               if (!cur) throw new Error("No weather");
               var temp = cur.temperature_2m;
-              windMph = cur.wind_speed_10m;
+              var windMph = cur.wind_speed_10m;
               var dir = windDirLabel(cur.wind_direction_10m);
               weatherEl.textContent =
                 "Air: " +
@@ -2640,8 +2605,7 @@
             .catch(function () {
               weatherEl.textContent = "Weather: unavailable";
               if (windEl) windEl.textContent = "Wind: —";
-            })
-            .then(doneOne);
+            });
         }
 
         if (refreshBtn) refreshBtn.addEventListener("click", loadLive);
