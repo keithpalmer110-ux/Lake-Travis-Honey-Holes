@@ -793,6 +793,19 @@
         margin: 0;
       }
 
+      ul.spot-summary-list {
+        margin: 0.15rem 0 0;
+        padding-left: 1.1rem;
+        list-style: disc;
+      }
+
+      ul.spot-summary-list li {
+        font-size: 0.82rem;
+        color: #355045;
+        line-height: 1.35;
+        margin: 0.2rem 0;
+      }
+
       .bait {
         font-size: 0.7rem;
         background: rgba(31, 77, 58, 0.16);
@@ -1666,36 +1679,72 @@
         return parseGuideNote(text).baits;
       }
 
-      function summarizeGuideText(raw) {
+      function guideInfoBullets(raw) {
         var text = String(raw || "")
           .replace(/\u00a0/g, " ")
-          .replace(/[ \t]+/g, " ")
-          .replace(/\n{3,}/g, "\n\n")
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
           .trim();
-        if (!text) return "";
-        // Drop leftover "Label:" lines with no content
-        text = text
-          .replace(/(?:^|\n)\s*[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:\s*(?=\n|$)/g, "\n")
-          .replace(/\n{2,}/g, "\n")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (!text) return "";
-        var sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
-        var summary = "";
-        for (var i = 0; i < sentences.length && i < 2; i++) {
-          var next = (summary + " " + sentences[i]).trim();
-          if (i > 0 && next.length > 220) break;
-          summary = next;
+        if (!text) return [];
+
+        var bullets = [];
+        var seen = {};
+
+        function addBullet(item) {
+          var t = String(item || "")
+            .replace(/[ \t]+/g, " ")
+            .replace(/^[\-•*]\s+/, "")
+            .replace(/^\d{1,2}[\.\)\:\-]\s+/, "")
+            .trim();
+          if (!t) return;
+          // Skip empty Label: lines and bait headers
+          if (/^[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:$/.test(t)) return;
+          if (/^(baits?|lures?|presentations?|rigs?|tackle)\s*:?$/i.test(t)) return;
+          if (t.length < 2) return;
+          var key = t.toLowerCase();
+          if (seen[key]) return;
+          seen[key] = true;
+          if (t.length > 160) {
+            t = t.slice(0, 157).replace(/\s+\S*$/, "") + "…";
+          }
+          bullets.push(t);
         }
-        if (summary.length > 240) {
-          summary = summary.slice(0, 237).replace(/\s+\S*$/, "") + "…";
+
+        // Prefer line breaks / Label: Value blocks
+        var lines = text.split(/\n+/);
+        var usedLines = false;
+        lines.forEach(function (line) {
+          line = line.trim();
+          if (!line) return;
+          // Split "A. foo. B. bar." style rare; keep Label: value as one bullet
+          if (/^[A-Za-z][A-Za-z0-9 /&-]{0,40}\s*:\s+\S/.test(line)) {
+            usedLines = true;
+            addBullet(line);
+            return;
+          }
+          if (lines.length > 1) {
+            usedLines = true;
+            // Long line → sentence bullets
+            if (line.length > 120 && /[.!?]/.test(line)) {
+              (line.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [line]).forEach(addBullet);
+            } else {
+              addBullet(line);
+            }
+          }
+        });
+
+        if (!usedLines || !bullets.length) {
+          var flat = text.replace(/\s+/g, " ").trim();
+          var sentences = flat.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [flat];
+          sentences.forEach(addBullet);
         }
-        return summary;
+
+        return bullets.slice(0, 8);
       }
 
       function parseGuideNote(text) {
         var raw = String(text || "").replace(/\u00a0/g, " ").trim();
-        if (!raw) return { summary: "", baits: [], whyFull: "" };
+        if (!raw) return { summaryBullets: [], baits: [], whyFull: "" };
 
         var baitMatch = raw.match(BAIT_LABEL_RE);
         var before = raw;
@@ -1724,13 +1773,16 @@
         }
 
         var baits = baitSection ? splitBaitsList(baitSection) : [];
-        // If bait chips still empty but section had comma text, keep split result
-        var summary = summarizeGuideText(before);
-        // If summary empty and we pulled baits from whole note, leave summary blank
-        if (!summary && !baits.length && raw) {
-          summary = summarizeGuideText(raw);
+        var summaryBullets = guideInfoBullets(before);
+        if (!summaryBullets.length && !baits.length && raw) {
+          summaryBullets = guideInfoBullets(raw);
         }
-        return { summary: summary, baits: baits, whyFull: raw };
+        return {
+          summaryBullets: summaryBullets,
+          summary: summaryBullets.join(" "),
+          baits: baits,
+          whyFull: raw
+        };
       }
 
       function parseKml(xmlText) {
@@ -1812,6 +1864,7 @@
             targets: targets,
             season: season,
             why: guideNote.summary || "",
+            summaryBullets: guideNote.summaryBullets || [],
             whyFull: descText,
             baits: baits,
             history: ""
@@ -2049,16 +2102,22 @@
         opts = opts || {};
         var baits = (spot.baits || []).filter(meaningfulMetaPart);
         var why = spot.why && spot.why !== "—" ? spot.why : "";
+        var bullets = (spot.summaryBullets || []).filter(meaningfulMetaPart);
         var isGuide = !!usingCustomKml;
         var html = "";
 
         if (isGuide) {
-          if (why) {
+          if (!bullets.length && why) bullets = [why];
+          if (bullets.length) {
             html +=
               '<div class="section-label">Summary</div>' +
-              '<p class="spot-summary">' +
-              why +
-              "</p>";
+              '<ul class="spot-summary-list">' +
+              bullets
+                .map(function (b) {
+                  return "<li>" + b + "</li>";
+                })
+                .join("") +
+              "</ul>";
           }
           if (baits.length) {
             html +=
